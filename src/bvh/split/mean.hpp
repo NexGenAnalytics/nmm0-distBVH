@@ -71,7 +71,9 @@ namespace bvh
         using kdop_type = typename traits_type::kdop_type;
         using arithmetic_type = typename kdop_type::arithmetic_type;
         arithmetic_type sum = 0;
-        Kokkos::parallel_reduce("LoopMean", _elements.size(), KOKKOS_LAMBDA (const int& i, arithmetic_type& lsum ) {
+        Kokkos::parallel_reduce( "LoopMean",
+          Kokkos::RangePolicy< Kokkos::DefaultHostExecutionSpace >( 0, static_cast< int >( _elements.size() ) ),
+          KOKKOS_LAMBDA (const int& i, arithmetic_type& lsum ) {
              const auto &c = _elements[i].centroid();
              lsum += kdop_type::project( c, _axis );
             }, sum);

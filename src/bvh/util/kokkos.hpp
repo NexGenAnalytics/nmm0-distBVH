@@ -39,6 +39,7 @@
 #include <limits>
 #include <algorithm>
 #include <type_traits>
+#include <span>
 
 namespace bvh
 {
@@ -74,6 +75,20 @@ namespace bvh
   template< typename T >
   using unmanaged_host_view = Kokkos::View< T, primary_execution_space::array_layout, host_execution_space,
                                             Kokkos::MemoryTraits< Kokkos::Unmanaged > >;
+
+  // Turn a Kokkos::View into a std::span: fails to compile if the view's
+  // memory isn't host-accessible, rather than silently reinterpreting a
+  // device pointer as host memory the way Kokkos's converting View constructor would.
+  template< typename DataType, typename... Props >
+  std::span< typename Kokkos::View< DataType, Props... >::value_type >
+  to_host_span( Kokkos::View< DataType, Props... > _view )
+  {
+    using view_type = Kokkos::View< DataType, Props... >;
+    static_assert( Kokkos::SpaceAccessibility< Kokkos::HostSpace, typename view_type::memory_space >::accessible,
+                   "to_host_span requires a host-accessible Kokkos::View; deep_copy device "
+                   "data into a host mirror before calling." );
+    return std::span< typename view_type::value_type >( _view.data(), _view.size() );
+  }
 }
 
 #endif  // INC_BVH_UTIL_KOKKOS_HPP

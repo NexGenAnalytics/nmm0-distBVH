@@ -286,13 +286,6 @@ namespace bvh
 
   template< typename SplittingMethod, typename AxisSelector, typename Element = bvh::entity_snapshot >
   void
-  split_permutations_ml( host_view< Element * > _elements, int _depth, element_permutations *_permutations )
-  {
-    split_permutations_ml< SplittingMethod, AxisSelector >( std::span( _elements.data(), _elements.size() ), _depth, _permutations );
-  }
-
-  template< typename SplittingMethod, typename AxisSelector, typename Element = bvh::entity_snapshot >
-  void
   split_permutations_ml( std::span< Element > _elements, int _depth, element_permutations *_permutations )
   {
     _permutations->indices.resize( _elements.size() );
@@ -314,13 +307,6 @@ namespace bvh
                         _permutations->indices, _permutations->splits,
                         std::span< std::pair< Element, size_t > >{combi.data(), _elements.size()} );
     }
-  }
-
-  template< typename SplittingMethod, typename AxisSelector, typename Element >
-  void
-  split_permutations( host_view< const Element * > _elements, int _depth, element_permutations *_permutations )
-  {
-    split_permutations< SplittingMethod, AxisSelector >( std::span( _elements.data(), _elements.size() ), _depth, _permutations );
   }
 
   template< typename SplittingMethod, typename AxisSelector, typename Element >

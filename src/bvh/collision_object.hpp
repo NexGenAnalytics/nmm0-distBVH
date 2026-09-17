@@ -152,11 +152,21 @@ namespace bvh
         std::abort();
       }
 #endif
-      switch ( _algorithm )
+      // geom_axis/ml_geom_axis are host-only; gate them behind if constexpr so a
+      // device-backed _data never forces the compiler to instantiate their bodies
+      using view_type = Kokkos::View< const T *, ViewProp... >;
+      if constexpr ( Kokkos::SpaceAccessibility< Kokkos::HostSpace, typename view_type::memory_space >::accessible )
       {
-        case split_algorithm::geom_axis: set_entity_data_geom_axis( _data ); break;
-        case split_algorithm::ml_geom_axis: set_entity_data_ml_geom_axis( _data ); break;
-        case split_algorithm::clustering: set_entity_data_clustering( _data ); break;
+        switch ( _algorithm )
+        {
+          case split_algorithm::geom_axis: set_entity_data_geom_axis( _data ); break;
+          case split_algorithm::ml_geom_axis: set_entity_data_ml_geom_axis( _data ); break;
+          case split_algorithm::clustering: set_entity_data_clustering( _data ); break;
+        }
+      }
+      else
+      {
+        set_entity_data_clustering( _data );
       }
     }
 
@@ -217,7 +227,9 @@ namespace bvh
       {
         ::vt::trace::TraceScopedEvent scope( this->bvh_splitting_ml_ );
         Kokkos::fence();  // snapshots need to finish updating
-        split_permutations_ml< split::mean, axis::longest, bvh::entity_snapshot >( get_snapshots(), depth,
+        auto &snap_h = get_snapshots_h();
+        Kokkos::deep_copy( snap_h, get_snapshots() );
+        split_permutations_ml< split::mean, axis::longest, bvh::entity_snapshot >( to_host_span( snap_h ), depth,
                                                                                    &m_last_permutations );
         initialize_split_indices( m_last_permutations );
       }
@@ -230,11 +242,15 @@ namespace bvh
     template< typename T, typename... ViewProp >
     void set_entity_data_geom_axis( Kokkos::View< const T *, ViewProp... > _data )
     {
+      static_assert( Kokkos::SpaceAccessibility< Kokkos::HostSpace,
+                       typename Kokkos::View< const T *, ViewProp... >::memory_space >::accessible,
+                     "set_entity_data_geom_axis requires host-accessible element data (geom_axis "
+                     "splitting runs on the CPU); use split_algorithm::clustering for GPU-resident data." );
       // Split data by overdecomposition factor
       const auto od_factor = this->overdecomposition_factor();
       int depth = bit_log2( od_factor );
       ::vt::trace::TraceScopedEvent scope( this->bvh_splitting_geom_axis_ );
-      split_permutations< split::mean, axis::longest, T >( _data, depth, &m_last_permutations );
+      split_permutations< split::mean, axis::longest, T >( to_host_span( _data ), depth, &m_last_permutations );
       set_entity_data_with_permutations( _data, m_last_permutations, std::move( scope ) );
     }
 

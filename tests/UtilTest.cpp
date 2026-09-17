@@ -53,3 +53,31 @@ TEST_CASE("kokkos prefix sum yields the correct results", "[utility][kokkos]")
 
   test_array( nums, 0, 3, 10, 12, 13, 17, 26, 27 );
 }
+
+TEST_CASE("to_host_span converts a host-accessible view to a matching span", "[utility][kokkos]")
+{
+  bvh::host_view< int * > nums{ "Numbers", 8 };
+  gen_array( nums, 3, 7, 2, 1, 4, 9, 1, 3 );
+
+  SECTION( "mutable view" )
+  {
+    auto sp = bvh::to_host_span( nums );
+
+    static_assert( std::is_same_v< decltype( sp )::element_type, int > );
+    REQUIRE( sp.size() == nums.extent( 0 ) );
+    REQUIRE( sp.data() == nums.data() );
+    for ( std::size_t i = 0; i < sp.size(); ++i )
+      REQUIRE( sp[i] == nums( i ) );
+  }
+
+  SECTION( "const view" )
+  {
+    bvh::host_view< const int * > const_nums( nums );
+    auto sp = bvh::to_host_span( const_nums );
+
+    static_assert( std::is_same_v< decltype( sp )::element_type, const int > );
+    REQUIRE( sp.size() == const_nums.extent( 0 ) );
+    for ( std::size_t i = 0; i < sp.size(); ++i )
+      REQUIRE( sp[i] == const_nums( i ) );
+  }
+}
